@@ -1,5 +1,8 @@
+[phases.setup]
+nixPkgs = ["python311"]
+
 [phases.install]
-cmds = ["pip install -r ai-service/requirements.txt"]
+cmds = ["python3 -m pip install -r ai-service/requirements.txt"]
 
 [start]
-cmd = "cd ai-service && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+cmd = "cd ai-service && python3 -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
