@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.local
+*.db
+*.db-journal
+__pycache__/
+*.pyc
+.DS_Store
+dist/
+.claude/
+storage/pdfs/*.pdf

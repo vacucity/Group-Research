@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships    ProjectMember[]
+  ownedProjects  Project[]       @relation("ProjectOwner")
+  uploadedPapers Paper[]         @relation("PaperUploader")
+  notes          Note[]
+  researchIdeas  ResearchIdea[]
+  collections    LiteratureCollection[]
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner   User            @relation("ProjectOwner", fields: [createdBy], references: [id])
+  papers  Paper[]
+  members ProjectMember[]
+  ideas   ResearchIdea[]
+  litCollections LiteratureCollection[]
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("EDITOR")
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model Paper {
+  id         String   @id @default(cuid())
+  projectId  String
+  title      String
+  authors    String?
+  abstract   String?
+  fileName   String
+  filePath   String
+  fileSize   Int
+  pageCount  Int?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader User       @relation("PaperUploader", fields: [uploadedBy], references: [id])
+  notes    Note[]
+  tags     PaperTag[]
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  color String @default("#6366f1")
+
+  papers PaperTag[]
+}
+
+model PaperTag {
+  id      String @id @default(cuid())
+  paperId String
+  tagId   String
+
+  paper Paper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([paperId, tagId])
+}
+
+model Note {
+  id          String   @id @default(cuid())
+  paperId     String
+  userId      String
+  type        String   @default("HIGHLIGHT")
+  content     String
+  targetText  String?
+  pageNumber  Int?
+  boundingBox String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  paper      Paper       @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcards Flashcard[]
+}
+
+model Flashcard {
+  id        String   @id @default(cuid())
+  noteId    String
+  front     String
+  back      String
+  createdAt DateTime @default(now())
+
+  note    Note              @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  reviews FlashcardReview[]
+}
+
+model FlashcardReview {
+  id          String   @id @default(cuid())
+  flashcardId String
+  userId      String
+  score       Int
+  reviewedAt  DateTime @default(now())
+
+  flashcard Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+}
+
+// ===== Literature Review Module =====
+
+model ResearchIdea {
+  id               String   @id @default(cuid())
+  projectId        String
+  userId           String
+  rawInput         String
+  structuredOutput String?
+  status           String   @default("draft")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  project          Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  candidatePapers  CandidatePaper[]
+}
+
+model CandidatePaper {
+  id             String   @id @default(cuid())
+  ideaId         String
+  title          String
+  authors        String?
+  abstract       String?
+  year           Int?
+  citationCount  Int?
+  source         String?
+  sourceId       String?
+  relevanceScore Float?
+  isSaved        Boolean  @default(false)
+  userNote       String?
+  createdAt      DateTime @default(now())
+
+  idea           ResearchIdea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+}
+
+model LiteratureCollection {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  papers    CollectionPaper[]
+}
+
+model CollectionPaper {
+  id           String   @id @default(cuid())
+  collectionId String
+  title        String
+  authors      String?
+  abstract     String?
+  year         Int?
+  source       String?
+  sourceId     String?
+  userNote     String?
+  addedAt      DateTime @default(now())
+
+  collection   LiteratureCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+}
