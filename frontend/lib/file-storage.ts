@@ -2,6 +2,10 @@ import { put, del } from "@vercel/blob";
 
 const BLOB_BASE = "pdfs-v2";
 
+function getToken() {
+  return process.env.BLOB_READ_WRITE_TOKEN || "";
+}
+
 export function getPaperPath(projectId: string, paperId: string) {
   return `${BLOB_BASE}/${projectId}/${paperId}.pdf`;
 }
@@ -12,7 +16,6 @@ export async function saveFile(
   paperId: string
 ): Promise<string> {
   const { url } = await put(getPaperPath(projectId, paperId), buffer, {
-    access: "public",
     contentType: "application/pdf",
   });
   return url;
@@ -28,7 +31,9 @@ export async function deleteFile(url: string) {
 
 export async function getFile(url: string): Promise<Buffer | null> {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
     if (!response.ok) return null;
     return Buffer.from(await response.arrayBuffer());
   } catch {
