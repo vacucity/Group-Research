@@ -26,7 +26,7 @@ export function RegisterForm() {
     setLoading(true);
     try {
       await register(name, email, password);
-      router.push("/projects");
+      router.push(`/verify?email=${encodeURIComponent(email)}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");
     } finally {

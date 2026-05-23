@@ -5,8 +5,11 @@ import { verifyJWT } from "./lib/jwt";
 const publicPaths = [
   "/login",
   "/register",
+  "/verify",
   "/api/auth/login",
   "/api/auth/register",
+  "/api/auth/verify",
+  "/api/auth/resend-code",
 ];
 
 function isPublicPath(pathname: string) {
@@ -14,12 +17,12 @@ function isPublicPath(pathname: string) {
     publicPaths.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    (pathname.includes("/api/papers/") && pathname.endsWith("/serve")) || // PDF serve is public (CUID-protected)
-    (pathname.includes("/api/papers/") && pathname.endsWith("/text"))   // Text extraction is public
+    (pathname.includes("/api/papers/") && pathname.endsWith("/serve")) ||
+    (pathname.includes("/api/papers/") && pathname.endsWith("/text"))
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublicPath(pathname)) {
@@ -29,7 +32,6 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
 
   if (!token) {
-    // API routes return 401, page routes redirect to /login
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, { status: 401 });
     }
@@ -47,7 +49,6 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Attach userId for API routes
   if (pathname.startsWith("/api/")) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-user-id", payload.userId);

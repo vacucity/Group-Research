@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireProjectMember } from "@/lib/auth-helpers";
 import { saveFile } from "@/lib/file-storage";
-import { extractPDFMetadata } from "@/lib/pdf-metadata";
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,11 +56,12 @@ export async function POST(request: NextRequest) {
 
     await requireProjectMember(user.id, projectId);
 
-    // Create paper record first to get ID
+    const title = file.name.replace(/\.pdf$/i, "");
+
     const paper = await prisma.paper.create({
       data: {
         projectId,
-        title: file.name.replace(/\.pdf$/i, ""),
+        title,
         fileName: file.name,
         filePath: "",
         fileSize: file.size,
@@ -69,23 +69,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Upload to blob storage + extract metadata in parallel
+    // Upload to Vercel Blob
     const buffer = Buffer.from(await file.arrayBuffer());
-    const [fileUrl, metadata] = await Promise.all([
-      saveFile(buffer, projectId, paper.id),
-      extractPDFMetadata(buffer, file.name),
-    ]);
+    const fileUrl = await saveFile(buffer, projectId, paper.id);
 
-    // Update paper with metadata
     const updated = await prisma.paper.update({
       where: { id: paper.id },
-      data: {
-        title: metadata.title || paper.title,
-        authors: metadata.authors,
-        abstract: metadata.abstract,
-        filePath: fileUrl,
-        pageCount: metadata.pageCount,
-      },
+      data: { filePath: fileUrl },
       include: { tags: { include: { tag: true } } },
     });
 

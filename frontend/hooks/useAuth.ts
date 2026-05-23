@@ -51,7 +51,7 @@ export const useAuth = create<AuthState>((set) => ({
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error?.message || "Registration failed");
-    set({ user: json.data.user, isAuthenticated: true });
+    // Don't set user — requires email verification first
   },
 
   logout: async () => {

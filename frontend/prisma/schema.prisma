@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -12,8 +13,11 @@ model User {
   email     String   @unique
   password  String
   name      String
-  avatarUrl String?
-  createdAt DateTime @default(now())
+  avatarUrl         String?
+  emailVerified     DateTime?
+  verificationCode  String?
+  verificationExp   DateTime?
+  createdAt         DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   memberships    ProjectMember[]
@@ -129,8 +133,6 @@ model FlashcardReview {
 
   flashcard Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
 }
-
-// ===== Literature Review Module =====
 
 model ResearchIdea {
   id               String   @id @default(cuid())
