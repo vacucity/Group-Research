@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const FROM = "ResearchFlow <noreply@researchflow.app>";
+const FROM = "ResearchFlow <noreply@mail.researchflow.app>";
 
 export async function sendVerificationEmail(
   to: string,
