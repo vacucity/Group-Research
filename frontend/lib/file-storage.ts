@@ -1,6 +1,6 @@
 import { put, del } from "@vercel/blob";
 
-const BLOB_BASE = "pdfs";
+const BLOB_BASE = "pdfs-v2";
 
 export function getPaperPath(projectId: string, paperId: string) {
   return `${BLOB_BASE}/${projectId}/${paperId}.pdf`;
