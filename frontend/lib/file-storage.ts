@@ -16,6 +16,7 @@ export async function saveFile(
   paperId: string
 ): Promise<string> {
   const { url } = await put(getPaperPath(projectId, paperId), buffer, {
+    access: "private",
     contentType: "application/pdf",
   });
   return url;
