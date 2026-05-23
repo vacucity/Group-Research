@@ -1,6 +1,0 @@
-{
-  "build": {
-    "builder": "nixpacks",
-    "nixpacksConfigPath": "ai-service"
-  }
-}
