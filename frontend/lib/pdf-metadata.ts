@@ -1,5 +1,3 @@
-import path from "path";
-
 export interface PDFMetadata {
   title: string;
   authors: string | null;
@@ -7,9 +5,13 @@ export interface PDFMetadata {
   pageCount: number;
 }
 
-export async function extractPDFMetadata(filePath: string): Promise<PDFMetadata> {
+export async function extractPDFMetadata(
+  buffer: Buffer,
+  fileName: string
+): Promise<PDFMetadata> {
   try {
     const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const path = await import("path");
     const { pathToFileURL } = await import("url");
 
     const workerPath = path.join(
@@ -22,15 +24,13 @@ export async function extractPDFMetadata(filePath: string): Promise<PDFMetadata>
     );
     pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
 
-    const fs = await import("fs/promises");
-    const data = new Uint8Array(await fs.readFile(filePath));
+    const data = new Uint8Array(buffer);
     const doc = await pdfjsLib.getDocument({ data }).promise;
 
     const metadata = await doc.getMetadata();
     const info = (metadata.info || {}) as Record<string, string>;
     const pageCount = doc.numPages;
 
-    // Get first page text as abstract
     let abstract = "";
     try {
       const page = await doc.getPage(1);
@@ -46,14 +46,14 @@ export async function extractPDFMetadata(filePath: string): Promise<PDFMetadata>
       // Best-effort abstract extraction
     }
 
-    const title = info.Title?.trim() || path.basename(filePath, ".pdf");
+    const title = info.Title?.trim() || fileName.replace(/\.pdf$/i, "");
     const authors = info.Author?.trim() || null;
 
     return { title, authors, abstract, pageCount };
   } catch (err) {
     console.error("PDF metadata extraction failed:", err);
     return {
-      title: path.basename(filePath, ".pdf"),
+      title: fileName.replace(/\.pdf$/i, ""),
       authors: null,
       abstract: null,
       pageCount: 0,

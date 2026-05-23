@@ -1,10 +1,9 @@
-import fs from "fs/promises";
-import path from "path";
+import { put, del } from "@vercel/blob";
 
-const STORAGE_ROOT = path.join(process.cwd(), "..", "storage", "pdfs");
+const BLOB_BASE = "pdfs";
 
 export function getPaperPath(projectId: string, paperId: string) {
-  return path.join(STORAGE_ROOT, projectId, `${paperId}.pdf`);
+  return `${BLOB_BASE}/${projectId}/${paperId}.pdf`;
 }
 
 export async function saveFile(
@@ -12,24 +11,26 @@ export async function saveFile(
   projectId: string,
   paperId: string
 ): Promise<string> {
-  const dir = path.join(STORAGE_ROOT, projectId);
-  await fs.mkdir(dir, { recursive: true });
-  const filePath = getPaperPath(projectId, paperId);
-  await fs.writeFile(filePath, buffer);
-  return filePath;
+  const { url } = await put(getPaperPath(projectId, paperId), buffer, {
+    access: "public",
+    contentType: "application/pdf",
+  });
+  return url;
 }
 
-export async function deleteFile(filePath: string) {
+export async function deleteFile(url: string) {
   try {
-    await fs.unlink(filePath);
+    await del(url);
   } catch {
     // File may not exist
   }
 }
 
-export async function getFile(filePath: string): Promise<Buffer | null> {
+export async function getFile(url: string): Promise<Buffer | null> {
   try {
-    return await fs.readFile(filePath);
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    return Buffer.from(await response.arrayBuffer());
   } catch {
     return null;
   }

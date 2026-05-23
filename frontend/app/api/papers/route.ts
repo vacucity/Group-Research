@@ -69,12 +69,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Save file to disk
+    // Upload to blob storage + extract metadata in parallel
     const buffer = Buffer.from(await file.arrayBuffer());
-    const filePath = await saveFile(buffer, projectId, paper.id);
-
-    // Extract PDF metadata
-    const metadata = await extractPDFMetadata(filePath);
+    const [fileUrl, metadata] = await Promise.all([
+      saveFile(buffer, projectId, paper.id),
+      extractPDFMetadata(buffer, file.name),
+    ]);
 
     // Update paper with metadata
     const updated = await prisma.paper.update({
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         title: metadata.title || paper.title,
         authors: metadata.authors,
         abstract: metadata.abstract,
-        filePath,
+        filePath: fileUrl,
         pageCount: metadata.pageCount,
       },
       include: { tags: { include: { tag: true } } },
