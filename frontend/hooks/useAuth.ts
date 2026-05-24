@@ -9,7 +9,7 @@ interface AuthState {
   isAuthenticated: boolean;
   fetchUser: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<{ message: string; devCode?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -51,7 +51,7 @@ export const useAuth = create<AuthState>((set) => ({
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error?.message || "Registration failed");
-    // Don't set user — requires email verification first
+    return json.data as { message: string; devCode?: string };
   },
 
   logout: async () => {

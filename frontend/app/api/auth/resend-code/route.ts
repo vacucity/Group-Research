@@ -39,7 +39,12 @@ export async function POST(request: NextRequest) {
 
     await sendVerificationEmail(email, code);
 
-    return NextResponse.json({ data: { message: "If the email exists, a new code has been sent." } });
+    return NextResponse.json({
+      data: {
+        message: "If the email exists, a new code has been sent.",
+        devCode: process.env.SKIP_EMAIL === "true" ? code : undefined,
+      },
+    });
   } catch {
     return NextResponse.json(
       { error: { code: "SERVER_ERROR", message: "Failed to resend code" } },

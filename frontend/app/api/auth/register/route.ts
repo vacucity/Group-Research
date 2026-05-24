@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       data: {
         message: "Account created. Please check your email for the verification code.",
-        devCode: process.env.NODE_ENV !== "production" ? code : undefined,
+        devCode: (process.env.NODE_ENV !== "production" || process.env.SKIP_EMAIL === "true") ? code : undefined,
       },
     }, { status: 201 });
   } catch {

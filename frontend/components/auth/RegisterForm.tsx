@@ -25,8 +25,9 @@ export function RegisterForm() {
     }
     setLoading(true);
     try {
-      await register(name, email, password);
-      router.push(`/verify?email=${encodeURIComponent(email)}`);
+      const data = await register(name, email, password);
+      const codeParam = data.devCode ? `&code=${data.devCode}` : "";
+      router.push(`/verify?email=${encodeURIComponent(email)}${codeParam}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");
     } finally {

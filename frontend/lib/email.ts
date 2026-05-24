@@ -6,6 +6,11 @@ export async function sendVerificationEmail(
   to: string,
   code: string
 ): Promise<boolean> {
+  if (process.env.SKIP_EMAIL === "true") {
+    console.log("[SKIP_EMAIL] Verification code for", to, ":", code);
+    return false;
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.log("[DEV] No RESEND_API_KEY set. Verification code:", code);

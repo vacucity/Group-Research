@@ -7,7 +7,8 @@ function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
-  const [code, setCode] = useState("");
+  const codeFromUrl = searchParams.get("code") || "";
+  const [code, setCode] = useState(codeFromUrl);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -40,12 +41,18 @@ function VerifyForm() {
   async function handleResend() {
     setResending(true);
     try {
-      await fetch("/api/auth/resend-code", {
+      const res = await fetch("/api/auth/resend-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      setError("A new code has been sent to your email.");
+      const json = await res.json();
+      if (json.data?.devCode) {
+        setCode(json.data.devCode);
+        setError(`Dev mode: code auto-filled (${json.data.devCode})`);
+      } else {
+        setError("A new code has been sent to your email.");
+      }
     } catch {
       setError("Failed to resend code.");
     } finally {
