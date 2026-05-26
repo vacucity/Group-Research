@@ -18,3 +18,9 @@ export async function requireProjectMember(userId: string, projectId: string) {
   if (!member) throw new Error("Forbidden: not a project member");
   return member;
 }
+
+export async function requireProjectOwner(userId: string, projectId: string) {
+  const member = await requireProjectMember(userId, projectId);
+  if (member.role !== "OWNER") throw new Error("Forbidden: only the project owner can perform this action");
+  return member;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ProjectMember } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,17 +17,23 @@ import {
   ShieldCheck,
   Users,
   UserPlus,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const router = useRouter();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"EDITOR" | "VIEWER">("EDITOR");
   const [inviting, setInviting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchMembers = () => {
     fetch(`/api/projects/${projectId}/members`)
@@ -40,7 +46,33 @@ export default function ProjectSettingsPage() {
 
   useEffect(() => {
     fetchMembers();
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data?.user?.id) setCurrentUserId(json.data.user.id);
+      })
+      .catch(() => {});
   }, [projectId]);
+
+  const isOwner = currentUserId
+    ? members.some((m) => m.userId === currentUserId && m.role === "OWNER")
+    : false;
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed");
+      toast.success("Project deleted");
+      router.push("/projects");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete project");
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
+    }
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,6 +239,65 @@ export default function ProjectSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      {isOwner && (
+        <Card className="mt-8 border-[var(--destructive)]/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-[var(--destructive)]">
+              <AlertTriangle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-[var(--muted-foreground)] mb-4">
+              Permanently delete this project and all of its data, including
+              papers, notes, research ideas, and member associations. This action
+              cannot be undone.
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete this project
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete project"
+        description="This will permanently delete the project and all associated data. This action cannot be undone."
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-[var(--destructive)]/30 bg-[var(--destructive)]/5 p-3">
+            <p className="text-sm text-[var(--foreground)]">
+              Are you sure you want to delete this project? All papers, notes,
+              ideas, and member data will be lost forever.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Yes, delete forever
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* Invite Dialog */}
       <Dialog
