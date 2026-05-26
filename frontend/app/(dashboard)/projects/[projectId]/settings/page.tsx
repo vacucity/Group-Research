@@ -10,10 +10,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import {
-  Plus,
   Loader2,
   UserX,
-  Shield,
   ShieldCheck,
   Users,
   UserPlus,

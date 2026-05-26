@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { Project } from "@/types";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
-import { Microscope, Loader2, Plus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Microscope, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const fetchProjects = () => {
     setLoading(true);
@@ -24,6 +26,10 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  const handleDeleted = (id: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+  };
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -60,7 +66,12 @@ export default function ProjectsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {projects.map((p) => (
-            <ProjectCard key={p.id} project={p} />
+            <ProjectCard
+              key={p.id}
+              project={p}
+              currentUserId={user?.id ?? null}
+              onDeleted={handleDeleted}
+            />
           ))}
         </div>
       )}
