@@ -17,6 +17,7 @@ function Breadcrumbs() {
     new: "New Project",
     notes: "Notes",
     research: "Research Assistant",
+    manuscripts: "Writing",
   };
 
   if (segments.length === 0) return null;

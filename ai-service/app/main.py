@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .config import settings
-from .routers import translate, analyze, qa, vision, flashcards, research
+from .routers import translate, analyze, qa, vision, flashcards, research, write
 
 app = FastAPI(title="ResearchFlow AI Service", version="0.1.0")
 
@@ -30,6 +30,7 @@ app.include_router(qa.router, dependencies=[Depends(verify_api_key)])
 app.include_router(vision.router, dependencies=[Depends(verify_api_key)])
 app.include_router(flashcards.router, dependencies=[Depends(verify_api_key)])
 app.include_router(research.router, dependencies=[Depends(verify_api_key)])
+app.include_router(write.router, dependencies=[Depends(verify_api_key)])
 
 
 @app.get("/health")

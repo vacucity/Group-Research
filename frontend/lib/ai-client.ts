@@ -139,3 +139,97 @@ export async function searchPapers(query: string, limit = 20) {
 
   return res.json();
 }
+
+// ===== Phase 2: AI Writing =====
+
+export async function generateOutline(
+  idea: string,
+  literature = "",
+  venue = "General Conference / Journal",
+  language = "Chinese"
+) {
+  const res = await fetch(`${AI_SERVICE_URL}/write/outline`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ idea, literature, venue, language }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail || "Outline generation failed");
+  }
+
+  return res.json();
+}
+
+export async function writeSection(params: {
+  section_title: string;
+  section_type?: string;
+  action?: string;
+  title?: string;
+  abstract?: string;
+  context?: string;
+  literature?: string;
+  existing_content?: string;
+  language?: string;
+}) {
+  const res = await fetch(`${AI_SERVICE_URL}/write/section`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      section_title: params.section_title,
+      section_type: params.section_type || "body",
+      action: params.action || "generate",
+      title: params.title || "",
+      abstract: params.abstract || "",
+      context: params.context || "",
+      literature: params.literature || "",
+      existing_content: params.existing_content || "",
+      language: params.language || "Chinese",
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail || "Section writing failed");
+  }
+
+  return res.json();
+}
+
+export async function suggestCitations(
+  text: string,
+  literature: string,
+  limit = 5
+) {
+  const res = await fetch(`${AI_SERVICE_URL}/write/citations/suggest`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ text, literature, limit }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail || "Citation suggestion failed");
+  }
+
+  return res.json();
+}
+
+export async function detectMissingCitations(
+  text: string,
+  existingCitations = ""
+) {
+  const res = await fetch(`${AI_SERVICE_URL}/write/citations/missing`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ text, existing_citations: existingCitations }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail || "Missing citation detection failed");
+  }
+
+  return res.json();
+}

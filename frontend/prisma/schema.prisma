@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -20,12 +19,17 @@ model User {
   createdAt         DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships    ProjectMember[]
-  ownedProjects  Project[]       @relation("ProjectOwner")
-  uploadedPapers Paper[]         @relation("PaperUploader")
-  notes          Note[]
-  researchIdeas  ResearchIdea[]
-  collections    LiteratureCollection[]
+  memberships        ProjectMember[]
+  ownedProjects      Project[]             @relation("ProjectOwner")
+  uploadedPapers     Paper[]               @relation("PaperUploader")
+  assignedSections   ManuscriptSection[]   @relation("SectionAssignee")
+  notes              Note[]
+  researchIdeas      ResearchIdea[]
+  collections        LiteratureCollection[]
+  manuscripts        Manuscript[]
+  manuscriptComments ManuscriptComment[]
+  manuscriptReviews  ManuscriptReview[]
+  manuscriptVersions ManuscriptVersion[]
 }
 
 model Project {
@@ -36,11 +40,12 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner   User            @relation("ProjectOwner", fields: [createdBy], references: [id])
-  papers  Paper[]
-  members ProjectMember[]
-  ideas   ResearchIdea[]
-  litCollections LiteratureCollection[]
+  owner           User                   @relation("ProjectOwner", fields: [createdBy], references: [id])
+  papers          Paper[]
+  members         ProjectMember[]
+  ideas           ResearchIdea[]
+  litCollections  LiteratureCollection[]
+  manuscripts     Manuscript[]
 }
 
 model ProjectMember {
@@ -70,10 +75,11 @@ model Paper {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  uploader User       @relation("PaperUploader", fields: [uploadedBy], references: [id])
-  notes    Note[]
-  tags     PaperTag[]
+  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader   User          @relation("PaperUploader", fields: [uploadedBy], references: [id])
+  notes      Note[]
+  tags       PaperTag[]
+  citations  ManuscriptCitation[]
 }
 
 model Tag {
@@ -193,4 +199,116 @@ model CollectionPaper {
   addedAt      DateTime @default(now())
 
   collection   LiteratureCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+}
+
+// ===== Phase 2: AI Academic Writing System =====
+
+model Manuscript {
+  id        String   @id @default(cuid())
+  projectId String
+  title     String
+  abstract  String?
+  status    String   @default("draft") // draft, writing, reviewing, completed
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator   User                 @relation(fields: [createdBy], references: [id])
+  sections  ManuscriptSection[]
+  citations ManuscriptCitation[]
+  comments  ManuscriptComment[]
+  reviews   ManuscriptReview[]
+  versions  ManuscriptVersion[]
+}
+
+model ManuscriptSection {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  title        String
+  content      String   @default("{}") // TipTap JSON document
+  orderIndex   Int
+  sectionType  String   @default("body") // abstract, introduction, related_work, methodology, experiments, conclusion, body
+  assignedTo   String?  // userId
+  status       String   @default("not_started") // not_started, drafting, reviewing, completed
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  assignee   User?               @relation("SectionAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  comments   ManuscriptComment[]
+  reviews    ManuscriptReview[]
+
+  @@unique([manuscriptId, orderIndex])
+}
+
+model ManuscriptCitation {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  paperId      String?  // FK to Paper in project library
+  title        String
+  authors      String?
+  year         Int?
+  source       String?
+  sourceId     String?
+  citationKey  String   // e.g., "vaswani2017attention"
+  orderIndex   Int
+  createdAt    DateTime @default(now())
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  paper      Paper?     @relation(fields: [paperId], references: [id], onDelete: SetNull)
+
+  @@unique([manuscriptId, citationKey])
+}
+
+model ManuscriptComment {
+  id           String    @id @default(cuid())
+  manuscriptId String
+  sectionId    String?
+  userId       String
+  content      String
+  type         String    @default("comment") // comment, suggestion
+  resolvedAt   DateTime?
+  anchoredTo   String?   // Yjs relative position (JSON)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  manuscript Manuscript          @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  section    ManuscriptSection?  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  user       User                @relation(fields: [userId], references: [id])
+}
+
+model ManuscriptReview {
+  id           String   @id @default(cuid())
+  manuscriptId String
+  sectionId    String?
+  userId       String   // who triggered the review
+  type         String   // grammar, logic, structure, contribution
+  content      String   // AI review result JSON
+  status       String   @default("pending") // pending, accepted, dismissed
+  createdAt    DateTime @default(now())
+
+  manuscript  Manuscript          @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  section     ManuscriptSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  triggerUser User                @relation(fields: [userId], references: [id])
+}
+
+model ManuscriptVersion {
+  id            String   @id @default(cuid())
+  manuscriptId  String
+  versionNumber Int
+  content       String   // Snapshot JSON
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  manuscript Manuscript @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  creator    User       @relation(fields: [createdBy], references: [id])
+}
+
+// For Hocuspocus Yjs document persistence
+model CollabDocument {
+  id        String   @id
+  // composite key: "manuscript:{id}:section:{id}"
+  ystate    String   // Base64-encoded Yjs state vector
+  updatedAt DateTime @updatedAt
 }

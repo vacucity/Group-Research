@@ -96,6 +96,79 @@ export interface FlashcardReview {
   reviewedAt: string;
 }
 
+// ===== Phase 2: Manuscript =====
+export type ManuscriptStatus = "draft" | "writing" | "reviewing" | "completed";
+export type SectionType = "abstract" | "introduction" | "related_work" | "methodology" | "experiments" | "conclusion" | "body";
+export type SectionStatus = "not_started" | "drafting" | "reviewing" | "completed";
+
+export interface Manuscript {
+  id: string;
+  projectId: string;
+  title: string;
+  abstract: string | null;
+  status: ManuscriptStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  sections?: ManuscriptSection[];
+  citations?: ManuscriptCitation[];
+  _count?: { sections: number; citations: number };
+}
+
+export interface ManuscriptSection {
+  id: string;
+  manuscriptId: string;
+  title: string;
+  content: Record<string, unknown>; // TipTap JSON
+  orderIndex: number;
+  sectionType: SectionType;
+  assignedTo: string | null;
+  status: SectionStatus;
+  createdAt: string;
+  updatedAt: string;
+  assignee?: { id: string; name: string; avatarUrl?: string | null };
+}
+
+export interface ManuscriptCitation {
+  id: string;
+  manuscriptId: string;
+  paperId: string | null;
+  title: string;
+  authors: string | null;
+  year: number | null;
+  source: string | null;
+  sourceId: string | null;
+  citationKey: string;
+  orderIndex: number;
+  createdAt: string;
+  paper?: Paper;
+}
+
+export interface ManuscriptComment {
+  id: string;
+  manuscriptId: string;
+  sectionId: string | null;
+  userId: string;
+  content: string;
+  type: string;
+  resolvedAt: string | null;
+  anchoredTo: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: UserProfile;
+}
+
+export interface ManuscriptReview {
+  id: string;
+  manuscriptId: string;
+  sectionId: string | null;
+  userId: string;
+  type: string;
+  content: Record<string, unknown>;
+  status: string;
+  createdAt: string;
+}
+
 // ===== API =====
 export interface ApiResponse<T> {
   data?: T;

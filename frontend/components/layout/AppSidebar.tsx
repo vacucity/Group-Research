@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   Lightbulb,
+  PenLine,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -38,6 +39,7 @@ export function AppSidebar({ open, onToggle }: Props) {
         { href: `/projects/${projectId}`, label: "Overview", icon: LayoutDashboard },
         { href: `/projects/${projectId}/papers`, label: "Library", icon: Library },
         { href: `/projects/${projectId}/research`, label: "Research", icon: Lightbulb },
+        { href: `/projects/${projectId}/manuscripts`, label: "Writing", icon: PenLine },
         { href: `/projects/${projectId}/settings`, label: "Settings", icon: Settings },
       ]
     : [];
