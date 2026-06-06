@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "cp prisma/schema.prisma.pg prisma/schema.prisma && npx prisma generate && next build",
+    "vercel-build": "cp prisma/schema.prisma.pg prisma/schema.prisma && npx prisma generate && npx prisma db push --accept-data-loss && next build",
     "start": "next start",
     "lint": "eslint"
   },
