@@ -24,3 +24,11 @@ export async function requireProjectOwner(userId: string, projectId: string) {
   if (member.role !== "OWNER") throw new Error("Forbidden: only the project owner can perform this action");
   return member;
 }
+
+export async function requireReviewMember(userId: string, workspaceId: string) {
+  const member = await prisma.reviewMember.findUnique({
+    where: { workspaceId_userId: { workspaceId, userId } },
+  });
+  if (!member) throw new Error("Forbidden: not a workspace member");
+  return member;
+}

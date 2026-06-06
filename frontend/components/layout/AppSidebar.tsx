@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Lightbulb,
   PenLine,
+  BookOpen,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -86,6 +87,18 @@ export function AppSidebar({ open, onToggle }: Props) {
           >
             <LayoutDashboard className="h-4 w-4" />
             My Projects
+          </Link>
+          <Link
+            href="/reviews"
+            className={clsx(
+              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all",
+              pathname === "/reviews" || pathname.startsWith("/reviews")
+                ? "bg-[var(--sidebar-active)] text-[var(--primary)] font-medium shadow-sm"
+                : "text-[var(--muted-foreground)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--foreground)]"
+            )}
+          >
+            <BookOpen className="h-4 w-4" />
+            Reviews
           </Link>
         </div>
 

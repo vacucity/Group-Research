@@ -30,6 +30,9 @@ model User {
   manuscriptComments ManuscriptComment[]
   manuscriptReviews  ManuscriptReview[]
   manuscriptVersions ManuscriptVersion[]
+  reviewWorkspaces   ReviewWorkspace[]
+  reviewMemberships  ReviewMember[]
+  reviewSections     ReviewSection[]      @relation("SectionAssigneeReview")
 }
 
 model Project {
@@ -313,4 +316,126 @@ model CollabDocument {
   // composite key: "manuscript:{id}:section:{id}"
   ystate    String   // Base64-encoded Yjs state vector
   updatedAt DateTime @updatedAt
+}
+
+// ===== Phase 2.5: ReviewOS — Literature Review System =====
+
+model ReviewWorkspace {
+  id            String   @id @default(cuid())
+  name          String
+  researchField String?
+  reviewType    String   @default("survey") // survey, related_work, systematic, comparative
+  targetVenue   String?
+  description   String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner    User              @relation(fields: [createdBy], references: [id])
+  members  ReviewMember[]
+  papers   ReviewPaper[]
+  clusters TopicCluster[]
+  gaps     ResearchGap[]
+  outline  ReviewOutlineItem[]
+  sections ReviewSection[]
+  tables   ComparisonTable[]
+}
+
+model ReviewMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String   @default("EDITOR") // OWNER, EDITOR, COMMENTATOR, VIEWER
+  joinedAt    DateTime @default(now())
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model ReviewPaper {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  title        String
+  authors      String?
+  abstract     String?
+  year         Int?
+  source       String?  // upload, doi, arxiv, zotero, bibtex, openalex
+  sourceId     String?  // DOI, arXiv ID, etc.
+  fileName     String?
+  filePath     String?
+  fileSize     Int?
+  status       String   @default("pending") // pending, parsing, parsed, error
+  parsedMemory String?  // JSON: extracted PaperMemory
+  addedAt      DateTime @default(now())
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, title])
+}
+
+model TopicCluster {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  color       String   @default("#6366f1")
+  paperIds    String   @default("[]") // JSON array of ReviewPaper IDs
+  createdAt   DateTime @default(now())
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+}
+
+model ResearchGap {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  description String
+  confidence  Float    @default(0.5)
+  evidence    String?  // JSON with source paper IDs + quotes
+  status      String   @default("open") // open, investigating, resolved
+  createdAt   DateTime @default(now())
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ReviewOutlineItem {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  parentId    String?  // for hierarchical outline (self-reference)
+  orderIndex  Int
+  sectionType String   @default("body")
+  createdAt   DateTime @default(now())
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ReviewSection {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  content     String   @default("{}") // TipTap JSON
+  orderIndex  Int
+  assignedTo  String?
+  status      String   @default("not_started")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignee   User?           @relation("SectionAssigneeReview", fields: [assignedTo], references: [id], onDelete: SetNull)
+}
+
+model ComparisonTable {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  columns     String   @default("[]") // JSON array of column definitions
+  rows        String   @default("[]") // JSON array of row data
+  createdAt   DateTime @default(now())
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

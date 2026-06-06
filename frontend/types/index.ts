@@ -171,6 +171,133 @@ export interface ManuscriptReview {
   createdAt: string;
 }
 
+// ===== Phase 2.5: ReviewOS =====
+
+export type ReviewType = "survey" | "related_work" | "systematic" | "comparative";
+export type ReviewMemberRole = "OWNER" | "EDITOR" | "COMMENTATOR" | "VIEWER";
+export type ReviewPaperStatus = "pending" | "parsing" | "parsed" | "error";
+export type GapStatus = "open" | "investigating" | "resolved";
+
+export interface ReviewWorkspace {
+  id: string;
+  name: string;
+  researchField: string | null;
+  reviewType: ReviewType;
+  targetVenue: string | null;
+  description: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { papers: number; clusters: number; gaps: number; sections: number };
+  owner?: UserProfile;
+  papers?: ReviewPaper[];
+  clusters?: TopicCluster[];
+}
+
+export interface ReviewMember {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: ReviewMemberRole;
+  joinedAt: string;
+  user?: UserProfile;
+}
+
+export interface ReviewPaper {
+  id: string;
+  workspaceId: string;
+  title: string;
+  authors: string | null;
+  abstract: string | null;
+  year: number | null;
+  source: string | null;
+  sourceId: string | null;
+  fileName: string | null;
+  filePath: string | null;
+  fileSize: number | null;
+  status: ReviewPaperStatus;
+  parsedMemory: PaperMemory | null;
+  addedAt: string;
+}
+
+export interface PaperMemory {
+  contribution: string;
+  method: string;
+  dataset: string;
+  metric: string;
+  limitation: string;
+  futureWork: string;
+  keywords: string[];
+}
+
+export interface TopicCluster {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string | null;
+  color: string;
+  paperIds: string[]; // parsed from JSON string
+  createdAt: string;
+}
+
+export interface ResearchGap {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description: string;
+  confidence: number;
+  evidence: GapEvidence[] | null;
+  status: GapStatus;
+  createdAt: string;
+}
+
+export interface GapEvidence {
+  paperId: string;
+  paperTitle: string;
+  quote: string;
+}
+
+export interface ReviewOutlineItem {
+  id: string;
+  workspaceId: string;
+  title: string;
+  parentId: string | null;
+  orderIndex: number;
+  sectionType: string;
+  createdAt: string;
+}
+
+export interface ReviewSection {
+  id: string;
+  workspaceId: string;
+  title: string;
+  content: Record<string, unknown>;
+  orderIndex: number;
+  assignedTo: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComparisonTable {
+  id: string;
+  workspaceId: string;
+  title: string;
+  columns: TableColumn[];
+  rows: TableRow[];
+  createdAt: string;
+}
+
+export interface TableColumn {
+  key: string;
+  label: string;
+}
+
+export interface TableRow {
+  paperTitle: string;
+  cells: Record<string, string>;
+}
+
 // ===== API =====
 export interface ApiResponse<T> {
   data?: T;
