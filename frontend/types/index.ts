@@ -119,7 +119,9 @@ export interface ManuscriptSection {
   id: string;
   manuscriptId: string;
   title: string;
-  content: Record<string, unknown>; // TipTap JSON
+  content: Record<string, unknown>; // TipTap JSON (WYSIWYG mode)
+  contentMode: "wysiwyg" | "latex";
+  latexContent: string | null; // LaTeX source (latex mode)
   orderIndex: number;
   sectionType: SectionType;
   assignedTo: string | null;

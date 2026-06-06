@@ -226,7 +226,9 @@ model ManuscriptSection {
   id           String   @id @default(cuid())
   manuscriptId String
   title        String
-  content      String   @default("{}") // TipTap JSON document
+  content      String   @default("{}") // TipTap JSON document (WYSIWYG mode)
+  contentMode  String   @default("wysiwyg") // "wysiwyg" or "latex"
+  latexContent String?  // LaTeX source content (when contentMode = "latex")
   orderIndex   Int
   sectionType  String   @default("body") // abstract, introduction, related_work, methodology, experiments, conclusion, body
   assignedTo   String?  // userId

@@ -19,6 +19,8 @@ import {
   Undo2,
   Redo2,
   Sparkles,
+  Search,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -36,6 +38,16 @@ export function ManuscriptToolbar({ editor, manuscriptId, section }: Props) {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiAction, setAiAction] = useState("improve");
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Citation suggestion
+  const [citeOpen, setCiteOpen] = useState(false);
+  const [citeResult, setCiteResult] = useState("");
+  const [citeLoading, setCiteLoading] = useState(false);
+
+  // Missing citation detection
+  const [missingOpen, setMissingOpen] = useState(false);
+  const [missingResult, setMissingResult] = useState("");
+  const [missingLoading, setMissingLoading] = useState(false);
 
   const ToolButton = ({
     onClick,
@@ -82,7 +94,6 @@ export function ManuscriptToolbar({ editor, manuscriptId, section }: Props) {
 
       const aiContent = json.data?.content || "";
       if (aiAction === "improve" || aiAction === "expand") {
-        // Replace entire content
         editor.commands.setContent(`<p>${aiContent.replace(/\n/g, "</p><p>")}</p>`);
       } else if (aiAction === "generate") {
         editor.commands.insertContent(
@@ -97,6 +108,52 @@ export function ManuscriptToolbar({ editor, manuscriptId, section }: Props) {
       toast.error(err instanceof Error ? err.message : "AI request failed");
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleSuggestCitations = async () => {
+    setCiteLoading(true);
+    try {
+      const res = await fetch("/api/ai/write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "citations",
+          text: editor.getText(),
+          limit: 5,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed");
+      setCiteResult(json.data?.suggestions || "No relevant citations found.");
+      setCiteOpen(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Citation suggestion failed");
+    } finally {
+      setCiteLoading(false);
+    }
+  };
+
+  const handleDetectMissing = async () => {
+    setMissingLoading(true);
+    try {
+      const res = await fetch("/api/ai/write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "missing",
+          text: editor.getText(),
+          existing_citations: "",
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed");
+      setMissingResult(json.data?.missing || "No missing citations detected.");
+      setMissingOpen(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Missing citation detection failed");
+    } finally {
+      setMissingLoading(false);
     }
   };
 
@@ -205,16 +262,38 @@ export function ManuscriptToolbar({ editor, manuscriptId, section }: Props) {
 
         <div className="w-px h-5 bg-[var(--border)] mx-1.5" />
 
+        {/* AI buttons */}
         <button
           type="button"
           onClick={() => setAiOpen(true)}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20 transition-colors ml-auto"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20 transition-colors"
         >
           <Sparkles className="h-3.5 w-3.5" />
           AI Write
         </button>
+
+        <button
+          type="button"
+          onClick={handleSuggestCitations}
+          disabled={citeLoading}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--secondary)] transition-colors"
+        >
+          <Search className="h-3.5 w-3.5" />
+          Cite
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDetectMissing}
+          disabled={missingLoading}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--secondary)] transition-colors"
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Check
+        </button>
       </div>
 
+      {/* AI Write Dialog */}
       <Dialog
         open={aiOpen}
         onClose={() => setAiOpen(false)}
@@ -248,6 +327,30 @@ export function ManuscriptToolbar({ editor, manuscriptId, section }: Props) {
               Run
             </Button>
           </div>
+        </div>
+      </Dialog>
+
+      {/* Citation Suggestions Dialog */}
+      <Dialog
+        open={citeOpen}
+        onClose={() => setCiteOpen(false)}
+        title="Suggested Citations"
+        description="AI-recommended citations for the current text."
+      >
+        <div className="max-h-80 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--foreground)] leading-relaxed">
+          {citeResult}
+        </div>
+      </Dialog>
+
+      {/* Missing Citation Detection Dialog */}
+      <Dialog
+        open={missingOpen}
+        onClose={() => setMissingOpen(false)}
+        title="Missing Citation Check"
+        description="Claims that may need citations."
+      >
+        <div className="max-h-80 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--foreground)] leading-relaxed">
+          {missingResult}
         </div>
       </Dialog>
     </>

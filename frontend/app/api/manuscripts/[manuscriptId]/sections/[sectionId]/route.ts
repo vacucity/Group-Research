@@ -40,6 +40,8 @@ export async function PATCH(
     if (body.status !== undefined) data.status = body.status;
     if (body.assignedTo !== undefined) data.assignedTo = body.assignedTo;
     if (body.orderIndex !== undefined) data.orderIndex = body.orderIndex;
+    if (body.contentMode !== undefined) data.contentMode = body.contentMode;
+    if (body.latexContent !== undefined) data.latexContent = body.latexContent;
 
     const updated = await prisma.manuscriptSection.update({
       where: { id: sectionId },

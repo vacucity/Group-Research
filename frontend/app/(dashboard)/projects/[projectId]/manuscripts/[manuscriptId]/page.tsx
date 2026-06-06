@@ -5,20 +5,19 @@ import { useParams } from "next/navigation";
 import { Manuscript, ManuscriptSection } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import {
   Loader2,
   Plus,
-  GripVertical,
-  Trash2,
   FileText,
   ChevronLeft,
   Sparkles,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ManuscriptEditor } from "@/components/writing/ManuscriptEditor";
-import { SectionCard } from "@/components/writing/SectionCard";
+import { SectionList } from "@/components/writing/SectionList";
+import { marked } from "marked";
 
 export default function ManuscriptEditorPage() {
   const { projectId, manuscriptId } = useParams<{
@@ -36,11 +35,17 @@ export default function ManuscriptEditorPage() {
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [outlineIdea, setOutlineIdea] = useState("");
   const [generatingOutline, setGeneratingOutline] = useState(false);
+  const [outlineResult, setOutlineResult] = useState<string | null>(null);
+  const [outlineResultOpen, setOutlineResultOpen] = useState(false);
 
   // Section creation
   const [newSectionOpen, setNewSectionOpen] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
-  const [newSectionType, setNewSectionType] = useState("body");
+
+  // Export
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportContent, setExportContent] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const fetchManuscript = useCallback(() => {
     fetch(`/api/manuscripts/${manuscriptId}`)
@@ -76,7 +81,7 @@ export default function ManuscriptEditorPage() {
         }
       );
       if (!res.ok) throw new Error("Failed to save");
-    } catch (err) {
+    } catch {
       toast.error("Failed to save section");
     } finally {
       setSaving(false);
@@ -93,7 +98,7 @@ export default function ManuscriptEditorPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: newSectionTitle.trim(),
-            sectionType: newSectionType,
+            sectionType: "body",
           }),
         }
       );
@@ -145,14 +150,45 @@ export default function ManuscriptEditorPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Failed");
-      toast.success("Outline generated! Use it to guide your sections.");
+      const outlineText = json.data?.outline || "";
+      setOutlineResult(outlineText);
+      setOutlineResultOpen(true);
       setOutlineOpen(false);
+      toast.success("Outline generated!");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to generate outline"
       );
     } finally {
       setGeneratingOutline(false);
+    }
+  };
+
+  const handleReorder = async (newSections: ManuscriptSection[]) => {
+    setSections(newSections);
+    // Persist new order
+    const orders = newSections.map((s, i) => ({ id: s.id, orderIndex: i }));
+    await fetch(`/api/manuscripts/${manuscriptId}/sections/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orders }),
+    });
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/manuscripts/${manuscriptId}/export`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed");
+      setExportContent(json.data?.content || "");
+      setExportOpen(true);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Export failed"
+      );
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -212,6 +248,19 @@ export default function ManuscriptEditorPage() {
             <Sparkles className="h-3.5 w-3.5 mr-1.5" />
             AI Outline
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={exporting || sections.length === 0}
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+            ) : (
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Export
+          </Button>
           <Button size="sm" onClick={() => setNewSectionOpen(true)}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Add Section
@@ -226,35 +275,28 @@ export default function ManuscriptEditorPage() {
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 px-1">
               Sections
             </p>
-            <div className="space-y-0.5">
-              {sections.map((section, index) => (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  index={index}
-                  isActive={section.id === activeSectionId}
-                  onClick={() => setActiveSectionId(section.id)}
-                  onDelete={() => handleDeleteSection(section.id)}
-                  onRename={async (newTitle) => {
-                    await fetch(
-                      `/api/manuscripts/${manuscriptId}/sections/${section.id}`,
-                      {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ title: newTitle }),
-                      }
-                    );
-                    setSections(
-                      sections.map((s) =>
-                        s.id === section.id
-                          ? { ...s, title: newTitle }
-                          : s
-                      )
-                    );
-                  }}
-                />
-              ))}
-            </div>
+            <SectionList
+              sections={sections}
+              activeSectionId={activeSectionId}
+              onSelect={setActiveSectionId}
+              onDelete={handleDeleteSection}
+              onRename={async (id, newTitle) => {
+                await fetch(
+                  `/api/manuscripts/${manuscriptId}/sections/${id}`,
+                  {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: newTitle }),
+                  }
+                );
+                setSections(
+                  sections.map((s) =>
+                    s.id === id ? { ...s, title: newTitle } : s
+                  )
+                );
+              }}
+              onReorder={handleReorder}
+            />
           </div>
         </div>
 
@@ -278,12 +320,12 @@ export default function ManuscriptEditorPage() {
         </div>
       </div>
 
-      {/* Add Section Dialog */}
+      {/* Add Section Dialog — no type dropdown */}
       <Dialog
         open={newSectionOpen}
         onClose={() => setNewSectionOpen(false)}
         title="Add Section"
-        description="Create a new section in your manuscript."
+        description="Name your section — you can add as many as you need."
       >
         <div className="space-y-4">
           <div>
@@ -299,24 +341,6 @@ export default function ManuscriptEditorPage() {
                 if (e.key === "Enter") handleAddSection();
               }}
             />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-[var(--foreground)] mb-1.5 block">
-              Type
-            </label>
-            <select
-              value={newSectionType}
-              onChange={(e) => setNewSectionType(e.target.value)}
-              className="flex h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--foreground)]"
-            >
-              <option value="body">Body</option>
-              <option value="abstract">Abstract</option>
-              <option value="introduction">Introduction</option>
-              <option value="related_work">Related Work</option>
-              <option value="methodology">Methodology</option>
-              <option value="experiments">Experiments</option>
-              <option value="conclusion">Conclusion</option>
-            </select>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button
@@ -335,7 +359,7 @@ export default function ManuscriptEditorPage() {
         </div>
       </Dialog>
 
-      {/* AI Outline Dialog */}
+      {/* AI Outline Input Dialog */}
       <Dialog
         open={outlineOpen}
         onClose={() => setOutlineOpen(false)}
@@ -370,6 +394,59 @@ export default function ManuscriptEditorPage() {
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
               Generate
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* AI Outline Result Dialog — renders markdown */}
+      <Dialog
+        open={outlineResultOpen}
+        onClose={() => setOutlineResultOpen(false)}
+        title="Generated Outline"
+        description="Use this outline to guide your section creation."
+      >
+        <div
+          className="max-h-96 overflow-y-auto prose prose-sm text-[var(--foreground)] leading-relaxed"
+          dangerouslySetInnerHTML={{
+            __html: marked.parse(outlineResult || ""),
+          }}
+        />
+        <div className="flex justify-end gap-3 pt-4">
+          <Button
+            variant="outline"
+            onClick={() => setOutlineResultOpen(false)}
+          >
+            Close
+          </Button>
+        </div>
+      </Dialog>
+
+      {/* Export Dialog */}
+      <Dialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        title="Export Paper"
+        description="Compiled paper from all sections in order."
+      >
+        <div className="space-y-4">
+          <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--foreground)] leading-relaxed bg-[var(--secondary)] rounded-lg p-4 font-mono">
+            {exportContent}
+          </pre>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setExportOpen(false)}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(exportContent);
+                toast.success("Copied to clipboard");
+              }}
+            >
+              Copy
             </Button>
           </div>
         </div>

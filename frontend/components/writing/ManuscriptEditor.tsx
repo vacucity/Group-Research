@@ -1,16 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import Underline from "@tiptap/extension-underline";
-import Link from "@tiptap/extension-link";
-import Highlight from "@tiptap/extension-highlight";
-import Subscript from "@tiptap/extension-subscript";
-import Superscript from "@tiptap/extension-superscript";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { ManuscriptSection } from "@/types";
-import { ManuscriptToolbar } from "./ManuscriptToolbar";
+import { WysiwygEditor } from "./WysiwygEditor";
+import { LatexEditor } from "./LatexEditor";
+import { FileText, Code } from "lucide-react";
 
 interface Props {
   section: ManuscriptSection;
@@ -19,122 +13,102 @@ interface Props {
 }
 
 export function ManuscriptEditor({ section, manuscriptId, onSave }: Props) {
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [mode, setMode] = useState<"wysiwyg" | "latex">(
+    section.contentMode || "wysiwyg"
+  );
+  const [latexValue, setLatexValue] = useState<string>(
+    section.latexContent || ""
+  );
+  const latexTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3, 4] },
-      }),
-      Placeholder.configure({
-        placeholder: `Start writing "${section.title}"...`,
-      }),
-      Underline,
-      Link.configure({ openOnClick: false }),
-      Highlight,
-      Subscript,
-      Superscript,
-    ],
-    content: parseContent(section.content),
-    onUpdate: ({ editor }) => {
-      // Autosave with debounce
-      const json = editor.getJSON();
-      debouncedSave(section.id, json);
-    },
-    editorProps: {
-      attributes: {
-        class:
-          "focus:outline-none min-h-[60vh] px-8 py-6 text-[var(--foreground)] text-sm leading-relaxed",
-      },
-    },
-  });
-
-  // Update editor content when section changes
+  // Reset mode and latex content when switching sections
   useEffect(() => {
-    if (editor && section.id) {
-      const currentJson = editor.getJSON();
-      const newJson = parseContent(section.content);
-      // Only reset if different section
-      if (JSON.stringify(currentJson) !== JSON.stringify(newJson)) {
-        editor.commands.setContent(newJson);
-      }
-    }
-  }, [section.id]);
+    setMode(section.contentMode || "wysiwyg");
+    setLatexValue(section.latexContent || "");
+  }, [section.id, section.contentMode, section.latexContent]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedSave = useCallback(
-    debounce(async (sectionId: string, json: Record<string, unknown>) => {
-      await onSave(sectionId, json);
-      setLastSaved(new Date());
-    }, 2000),
-    [onSave]
+  const handleLatexChange = useCallback(
+    (value: string) => {
+      setLatexValue(value);
+      if (latexTimer.current) clearTimeout(latexTimer.current);
+      latexTimer.current = setTimeout(async () => {
+        try {
+          await fetch(
+            `/api/manuscripts/${manuscriptId}/sections/${section.id}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                latexContent: value,
+                contentMode: "latex",
+              }),
+            }
+          );
+        } catch {
+          // silent save failure
+        }
+      }, 2000);
+    },
+    [manuscriptId, section.id]
   );
 
-  if (!editor) {
-    return null;
-  }
+  const handleModeSwitch = async (newMode: "wysiwyg" | "latex") => {
+    setMode(newMode);
+    await fetch(`/api/manuscripts/${manuscriptId}/sections/${section.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contentMode: newMode }),
+    });
+  };
 
   return (
     <div className="flex flex-col h-full">
-      <ManuscriptToolbar editor={editor} manuscriptId={manuscriptId} section={section} />
-      <div className="flex-1 overflow-y-auto">
-        <EditorContent editor={editor} />
+      {/* Mode toggle bar */}
+      <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
+        <div className="flex items-center gap-0.5 bg-[var(--secondary)] rounded-lg p-0.5">
+          <button
+            onClick={() => handleModeSwitch("wysiwyg")}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              mode === "wysiwyg"
+                ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Word
+          </button>
+          <button
+            onClick={() => handleModeSwitch("latex")}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              mode === "latex"
+                ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            <Code className="h-3.5 w-3.5" />
+            LaTeX
+          </button>
+        </div>
+        <span className="text-[10px] text-[var(--muted-foreground)]">
+          {mode === "latex"
+            ? "Edit LaTeX source — export as .tex to compile"
+            : "Rich text editing"}
+        </span>
       </div>
-      <div className="px-4 py-1.5 border-t border-[var(--border)] bg-[var(--card)] text-[10px] text-[var(--muted-foreground)] shrink-0">
-        {lastSaved
-          ? `Last saved ${lastSaved.toLocaleTimeString()}`
-          : "No changes yet"}
-      </div>
+
+      {/* Editor area */}
+      {mode === "wysiwyg" ? (
+        <WysiwygEditor
+          section={section}
+          manuscriptId={manuscriptId}
+          onSave={onSave}
+        />
+      ) : (
+        <LatexEditor
+          content={latexValue}
+          onChange={handleLatexChange}
+        />
+      )}
     </div>
   );
-}
-
-// Parse stored content (string JSON) to TipTap JSON object
-function parseContent(content: unknown): Record<string, unknown> {
-  if (!content) return defaultDoc();
-  if (typeof content === "object" && content !== null) {
-    const obj = content as Record<string, unknown>;
-    // TipTap content has a "type" field
-    if (obj.type) return obj;
-    return defaultDoc();
-  }
-  if (typeof content === "string") {
-    try {
-      const parsed = JSON.parse(content);
-      if (parsed && parsed.type) return parsed;
-    } catch {
-      // Not JSON, treat as plain text
-    }
-    if (content === "{}" || content === "") return defaultDoc();
-    // Plain text -> convert to TipTap doc
-    return {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: content.trim() ? [{ type: "text", text: content }] : [],
-        },
-      ],
-    };
-  }
-  return defaultDoc();
-}
-
-function defaultDoc(): Record<string, unknown> {
-  return {
-    type: "doc",
-    content: [{ type: "paragraph", content: [] }],
-  };
-}
-
-// Simple debounce utility
-function debounce(
-  fn: (sectionId: string, json: Record<string, unknown>) => Promise<void>,
-  delay: number
-) {
-  let timer: ReturnType<typeof setTimeout>;
-  return (sectionId: string, json: Record<string, unknown>) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(sectionId, json), delay);
-  };
 }

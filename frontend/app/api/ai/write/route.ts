@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateOutline, writeSection } from "@/lib/ai-client";
+import {
+  generateOutline,
+  writeSection,
+  suggestCitations,
+  detectMissingCitations,
+} from "@/lib/ai-client";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +34,23 @@ export async function POST(request: NextRequest) {
           existing_content: params.existing_content || "",
           language: params.language || "Chinese",
         });
+        return NextResponse.json({ data: result });
+      }
+
+      case "citations": {
+        const result = await suggestCitations(
+          params.text || "",
+          params.literature || "No literature provided.",
+          params.limit || 5
+        );
+        return NextResponse.json({ data: result });
+      }
+
+      case "missing": {
+        const result = await detectMissingCitations(
+          params.text || "",
+          params.existing_citations || ""
+        );
         return NextResponse.json({ data: result });
       }
 

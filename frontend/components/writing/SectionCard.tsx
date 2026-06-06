@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ManuscriptSection } from "@/types";
 import { GripVertical, Trash2, Check } from "lucide-react";
 
@@ -12,16 +14,6 @@ interface Props {
   onDelete: () => void;
   onRename: (newTitle: string) => Promise<void>;
 }
-
-const sectionTypeLabels: Record<string, string> = {
-  abstract: "Abstract",
-  introduction: "Intro",
-  related_work: "Related",
-  methodology: "Method",
-  experiments: "Experiments",
-  conclusion: "Conclusion",
-  body: "Body",
-};
 
 const statusColors: Record<string, string> = {
   not_started: "bg-gray-200 dark:bg-gray-700",
@@ -42,6 +34,21 @@ export function SectionCard({
   const [title, setTitle] = useState(section.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   const handleRename = async () => {
     const trimmed = title.trim();
     if (trimmed && trimmed !== section.title) {
@@ -52,6 +59,8 @@ export function SectionCard({
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       onClick={onClick}
       className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
         isActive
@@ -59,13 +68,24 @@ export function SectionCard({
           : "hover:bg-[var(--secondary)] text-[var(--foreground)]"
       }`}
     >
-      <GripVertical className="h-3 w-3 shrink-0 text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 transition-opacity" />
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab active:cursor-grabbing text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+
+      {/* Status dot */}
       <div
         className={`h-2 w-2 rounded-full shrink-0 ${
           statusColors[section.status] || statusColors.not_started
         }`}
       />
-      <span className="text-[10px] font-mono text-[var(--muted-foreground)] shrink-0">
+
+      <span className="text-[10px] font-mono text-[var(--muted-foreground)] shrink-0 w-4 text-right">
         {index + 1}
       </span>
 
@@ -84,11 +104,11 @@ export function SectionCard({
         />
       ) : (
         <>
-          <div className="flex-1 min-w-0">
+          <div
+            className="flex-1 min-w-0"
+            onDoubleClick={() => setEditing(true)}
+          >
             <p className="text-xs font-medium truncate">{section.title}</p>
-            <p className="text-[10px] text-[var(--muted-foreground)]">
-              {sectionTypeLabels[section.sectionType] || section.sectionType}
-            </p>
           </div>
 
           {confirmDelete ? (
