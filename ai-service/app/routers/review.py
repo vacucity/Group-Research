@@ -1,6 +1,7 @@
 """ReviewOS AI router — knowledge extraction, clustering, gap discovery, outlines."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from ..services.llm_client import reason_llm
 
@@ -180,3 +181,51 @@ async def write_review_section(req: SectionWriteRequest):
         [{"role": "user", "content": prompt}], max_tokens=4096
     )
     return {"content": result}
+
+
+# ===== LangGraph Pipeline =====
+
+class PipelineRequest(BaseModel):
+    workspace_id: str = Field(..., min_length=1)
+    papers: str = Field(default="[]")  # JSON array of paper objects
+    metadata: str = Field(default="{}")  # JSON: workspace_name, language, review_type, etc.
+
+
+@router.post("/review/pipeline/stream")
+async def run_pipeline_stream(req: PipelineRequest):
+    """Run the full LangGraph review pipeline with SSE streaming.
+
+    Yields progress events as SSE:
+        step: current agent node
+        progress: node label + index
+        complete: final results (memories, clusters, gaps, drafts)
+        error: error info if pipeline fails
+    """
+    import json
+    from ..agents.graph import run_pipeline_stream as execute_pipeline
+
+    papers = json.loads(req.papers) if isinstance(req.papers, str) else req.papers
+    metadata = json.loads(req.metadata) if isinstance(req.metadata, str) else req.metadata
+
+    state = {
+        "workspace_id": req.workspace_id,
+        "papers": papers,
+        "paper_memories": [],
+        "topic_clusters": [],
+        "research_gaps": [],
+        "section_drafts": [],
+        "current_step": "init",
+        "errors": [],
+        "ckpt_id": None,
+        "metadata": metadata,
+    }
+
+    return StreamingResponse(
+        execute_pipeline(state),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

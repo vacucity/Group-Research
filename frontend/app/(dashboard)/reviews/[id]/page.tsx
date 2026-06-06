@@ -18,6 +18,9 @@ import {
   Sparkles,
   FileText,
   Layers,
+  Play,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +54,17 @@ export default function ReviewWorkspacePage() {
 
   // Parsing
   const [parsingId, setParsingId] = useState<string | null>(null);
+
+  // Pipeline
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelineStep, setPipelineStep] = useState("");
+  const [pipelineProgress, setPipelineProgress] = useState(0);
+  const [pipelineTotal, setPipelineTotal] = useState(5);
+  const [pipelineResult, setPipelineResult] = useState<{
+    gaps: Array<Record<string, unknown>>;
+    drafts: Array<Record<string, unknown>>;
+  } | null>(null);
+  const [pipelineError, setPipelineError] = useState("");
 
   const fetchData = useCallback(() => {
     fetch(`/api/reviews/${workspaceId}`)
@@ -208,6 +222,97 @@ export default function ReviewWorkspacePage() {
     }
   };
 
+  const runPipeline = async () => {
+    if (papers.length < 3) {
+      toast.error("Need at least 3 papers to run the pipeline");
+      return;
+    }
+    setPipelineRunning(true);
+    setPipelineStep("Starting pipeline...");
+    setPipelineProgress(0);
+    setPipelineError("");
+    setPipelineResult(null);
+
+    try {
+      const res = await fetch("/api/ai/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "pipeline",
+          workspace_id: workspaceId,
+          papers: JSON.stringify(
+            papers.map((p) => ({
+              id: p.id,
+              title: p.title,
+              authors: p.authors || "",
+              abstract: p.abstract || "",
+              year: p.year,
+            }))
+          ),
+          metadata: JSON.stringify({
+            workspace_name: workspace?.name || "",
+            research_field: workspace?.researchField || "",
+            review_type: workspace?.reviewType || "survey",
+            language: "Chinese",
+          }),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Pipeline request failed");
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              const { event, data } = parsed;
+
+              if (event === "step") {
+                setPipelineStep(data.step || data.current_step || "");
+              } else if (event === "progress") {
+                setPipelineStep(data.label || "");
+                setPipelineProgress(data.index || 0);
+                setPipelineTotal(data.total || 5);
+              } else if (event === "complete") {
+                setPipelineResult({
+                  gaps: data.research_gaps || [],
+                  drafts: data.section_drafts || [],
+                });
+                setPipelineProgress(data.total || 5);
+                toast.success(
+                  `Pipeline complete: ${data.gap_count || 0} gaps, ${data.draft_count || 0} drafts`
+                );
+              } else if (event === "error") {
+                setPipelineError(data.message || "Unknown error");
+                toast.error(data.message || "Pipeline error");
+              }
+            } catch {
+              // skip parse errors
+            }
+          }
+        }
+      }
+    } catch (err) {
+      setPipelineError(err instanceof Error ? err.message : "Pipeline failed");
+      toast.error(err instanceof Error ? err.message : "Pipeline failed");
+    } finally {
+      setPipelineRunning(false);
+    }
+  };
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { key: "papers", label: "Papers", icon: <FileText className="h-4 w-4" />, count: papers.length },
     { key: "clusters", label: "Clusters", icon: <Layers className="h-4 w-4" />, count: clusters.length },
@@ -249,7 +354,47 @@ export default function ReviewWorkspacePage() {
             {workspace.reviewType}
           </span>
         </div>
+        <Button
+          onClick={runPipeline}
+          disabled={pipelineRunning || papers.length < 3}
+          variant="default"
+          size="sm"
+        >
+          {pipelineRunning ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Play className="h-4 w-4 mr-2" />
+          )}
+          {pipelineRunning ? "Running..." : "Run Pipeline"}
+        </Button>
       </div>
+
+      {/* Pipeline progress */}
+      {pipelineRunning && (
+        <div className="mb-6 p-4 rounded-lg border border-[var(--primary)]/30 bg-[var(--primary)]/5">
+          <div className="flex items-center gap-3 mb-2">
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--primary)]" />
+            <p className="text-sm font-medium text-[var(--foreground)]">{pipelineStep}</p>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--secondary)] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-[var(--primary)] transition-all duration-500"
+              style={{ width: `${((pipelineProgress / pipelineTotal) * 100).toFixed(0)}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-[var(--muted-foreground)] mt-1.5">
+            Step {pipelineProgress} of {pipelineTotal}
+          </p>
+        </div>
+      )}
+
+      {/* Pipeline error */}
+      {pipelineError && !pipelineRunning && (
+        <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 flex items-center gap-3">
+          <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+          <p className="text-sm text-red-700">{pipelineError}</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)]">

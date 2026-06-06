@@ -25,11 +25,41 @@ export async function POST(request: NextRequest) {
       case "write-section":
         endpoint = "/review/write-section";
         break;
+      case "pipeline":
+        endpoint = "/review/pipeline/stream";
+        break;
       default:
         return NextResponse.json(
           { error: { code: "VALIDATION", message: `Unknown action: ${action}` } },
           { status: 400 }
         );
+    }
+
+    // For SSE streaming endpoints, proxy the stream directly
+    if (action === "pipeline") {
+      const res = await fetch(`${AI_SERVICE_URL}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${AI_SERVICE_API_KEY}`,
+        },
+        body: JSON.stringify(params),
+      });
+
+      if (!res.ok) {
+        return NextResponse.json(
+          { error: { code: "AI_ERROR", message: "Pipeline request failed" } },
+          { status: res.status }
+        );
+      }
+
+      return new Response(res.body, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
     }
 
     const res = await fetch(`${AI_SERVICE_URL}${endpoint}`, {
