@@ -298,6 +298,40 @@ export interface TableRow {
   cells: Record<string, string>;
 }
 
+// ===== Part 4: Memory Layer =====
+
+export interface PaperSection {
+  id: string;
+  paperId: string;
+  sectionName: string;
+  content: string;
+  chunkOrder: number;
+  createdAt: string;
+}
+
+export interface AgentRun {
+  id: string;
+  workspaceId: string;
+  agentName: string;
+  status: "running" | "completed" | "failed";
+  input: string | null;
+  output: string | null;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface ReviewVersion {
+  id: string;
+  workspaceId: string;
+  versionNumber: number;
+  label: string | null;
+  snapshotPath: string | null;
+  snapshotData: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
 // ===== API =====
 export interface ApiResponse<T> {
   data?: T;

@@ -331,14 +331,16 @@ model ReviewWorkspace {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  owner    User              @relation(fields: [createdBy], references: [id])
-  members  ReviewMember[]
-  papers   ReviewPaper[]
-  clusters TopicCluster[]
-  gaps     ResearchGap[]
-  outline  ReviewOutlineItem[]
-  sections ReviewSection[]
-  tables   ComparisonTable[]
+  owner     User              @relation(fields: [createdBy], references: [id])
+  members   ReviewMember[]
+  papers    ReviewPaper[]
+  clusters  TopicCluster[]
+  gaps      ResearchGap[]
+  outline   ReviewOutlineItem[]
+  sections  ReviewSection[]
+  tables    ComparisonTable[]
+  agentRuns AgentRun[]
+  versions  ReviewVersion[]
 }
 
 model ReviewMember {
@@ -371,6 +373,7 @@ model ReviewPaper {
   addedAt      DateTime @default(now())
 
   workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sections   PaperSection[]
 
   @@unique([workspaceId, title])
 }
@@ -436,6 +439,46 @@ model ComparisonTable {
   columns     String   @default("[]") // JSON array of column definitions
   rows        String   @default("[]") // JSON array of row data
   createdAt   DateTime @default(now())
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ===== Phase 2.5 Part 4: Memory Layer — Paper Chunking, Agent Runs, Versioning =====
+
+model PaperSection {
+  id          String   @id @default(cuid())
+  paperId     String   // FK to ReviewPaper
+  sectionName String   // Introduction, Method, Experiment, Conclusion, etc.
+  content     String   // Full text of this section
+  chunkOrder  Int
+  createdAt   DateTime @default(now())
+
+  paper ReviewPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+}
+
+model AgentRun {
+  id          String    @id @default(cuid())
+  workspaceId String
+  agentName   String    // PaperParsing, PaperUnderstanding, TopicClustering, etc.
+  status      String    @default("running") // running, completed, failed
+  input       String?   // JSON: input state snapshot
+  output      String?   // JSON: output state snapshot
+  error       String?   // Error message if failed
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+
+  workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ReviewVersion {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  versionNumber  Int
+  label          String?  // User-defined label, e.g., "Initial draft", "After revision"
+  snapshotPath   String?  // Path to checkpoint file
+  snapshotData   String?  // JSON: full workspace snapshot
+  createdBy      String
+  createdAt      DateTime @default(now())
 
   workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
