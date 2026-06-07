@@ -12,6 +12,9 @@ from .understanding import run_understanding
 from .clustering import run_clustering
 from .gap_discovery import run_gap_discovery
 from .section_writing import run_section_writing
+from .evolution import run_evolution
+from .conflict import run_conflict_detection
+from .assembly import run_assembly
 from .checkpoint import FileCheckpointSaver
 
 logger = logging.getLogger(__name__)
@@ -20,25 +23,31 @@ logger = logging.getLogger(__name__)
 def build_review_graph() -> StateGraph:
     """Build and compile the ReviewOS agent graph.
 
-    Topology:
-        START → parse_papers → understand_papers → cluster_topics → discover_gaps → write_sections → END
+    Topology (8 agents):
+        parse → understand → cluster → evolution → gaps → write → conflict → assembly → END
     """
     workflow = StateGraph(ReviewState)
 
-    # Add nodes
+    # Add nodes — 8 agents total
     workflow.add_node("parse_papers", run_parsing)
     workflow.add_node("understand_papers", run_understanding)
     workflow.add_node("cluster_topics", run_clustering)
+    workflow.add_node("discover_evolution", run_evolution)
     workflow.add_node("discover_gaps", run_gap_discovery)
     workflow.add_node("write_sections", run_section_writing)
+    workflow.add_node("detect_conflicts", run_conflict_detection)
+    workflow.add_node("assemble_review", run_assembly)
 
     # Wire edges — linear pipeline
     workflow.set_entry_point("parse_papers")
     workflow.add_edge("parse_papers", "understand_papers")
     workflow.add_edge("understand_papers", "cluster_topics")
-    workflow.add_edge("cluster_topics", "discover_gaps")
+    workflow.add_edge("cluster_topics", "discover_evolution")
+    workflow.add_edge("discover_evolution", "discover_gaps")
     workflow.add_edge("discover_gaps", "write_sections")
-    workflow.add_edge("write_sections", END)
+    workflow.add_edge("write_sections", "detect_conflicts")
+    workflow.add_edge("detect_conflicts", "assemble_review")
+    workflow.add_edge("assemble_review", END)
 
     # Compile with memory saver for checkpointing
     memory = MemorySaver()
@@ -69,8 +78,11 @@ async def run_pipeline_stream(state: dict) -> AsyncGenerator[str, None]:
         ("parse_papers", "Parsing paper metadata..."),
         ("understand_papers", "Extracting paper knowledge..."),
         ("cluster_topics", "Grouping into topic clusters..."),
+        ("discover_evolution", "Tracing method evolution..."),
         ("discover_gaps", "Discovering research gaps..."),
         ("write_sections", "Writing section drafts..."),
+        ("detect_conflicts", "Detecting paper conflicts..."),
+        ("assemble_review", "Assembling final review..."),
     ]
 
     step_index = 0

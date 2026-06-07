@@ -46,6 +46,10 @@ class ReviewState(TypedDict):
     topic_clusters: list[dict[str, Any]]
     research_gaps: list[dict[str, Any]]
     section_drafts: list[dict[str, Any]]
+    evolution_graph: dict[str, Any]       # Agent 6: MethodEvolutionAgent output
+    conflict_reports: list[dict[str, Any]]  # Agent 10: ConflictDetectionAgent output
+    final_review: str                      # Agent 11: ReviewAssemblyAgent output
+    reflection_log: list[dict[str, Any]]   # Self-critique history
     current_step: str
     errors: list[dict[str, Any]]
     ckpt_id: str | None
