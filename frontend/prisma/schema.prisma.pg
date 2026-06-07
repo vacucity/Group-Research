@@ -444,6 +444,20 @@ model ComparisonTable {
   workspace ReviewWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
+// ===== Phase 2.5 Part 4: Prompt Registry =====
+
+model PromptRegistry {
+  id           String   @id @default(cuid())
+  name         String
+  version      String
+  systemPrompt String
+  inputSchema  String?  // JSON
+  outputSchema String?  // JSON
+  createdAt    DateTime @default(now())
+
+  @@unique([name, version])
+}
+
 // ===== Phase 2.5 Part 4: Memory Layer =====
 
 model PaperSection {
