@@ -21,10 +21,13 @@ import {
   Play,
   CheckCircle2,
   AlertCircle,
+  GitBranch,
+  Download,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
-type Tab = "papers" | "clusters" | "gaps" | "outline" | "compare";
+type Tab = "papers" | "clusters" | "gaps" | "evolution" | "conflicts" | "outline" | "compare";
 
 export default function ReviewWorkspacePage() {
   const { id: workspaceId } = useParams<{ id: string }>();
@@ -316,9 +319,11 @@ export default function ReviewWorkspacePage() {
   const tabs: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { key: "papers", label: "Papers", icon: <FileText className="h-4 w-4" />, count: papers.length },
     { key: "clusters", label: "Clusters", icon: <Layers className="h-4 w-4" />, count: clusters.length },
+    { key: "evolution", label: "Evolution", icon: <GitBranch className="h-4 w-4" /> },
     { key: "gaps", label: "Gaps", icon: <Sparkles className="h-4 w-4" /> },
+    { key: "conflicts", label: "Conflicts", icon: <AlertTriangle className="h-4 w-4" /> },
     { key: "outline", label: "Outline", icon: <BookOpen className="h-4 w-4" /> },
-    { key: "compare", label: "Compare", icon: <FileText className="h-4 w-4" /> },
+    { key: "compare", label: "Export", icon: <Download className="h-4 w-4" /> },
   ];
 
   if (loading) {
@@ -515,23 +520,69 @@ export default function ReviewWorkspacePage() {
         </div>
       )}
 
-      {/* Gaps / Outline / Compare Tabs (placeholder for future parts) */}
+      {/* Evolution Tab */}
+      {activeTab === "evolution" && (
+        <div>
+          <p className="text-xs text-[var(--muted-foreground)] mb-4">
+            Method evolution timeline — papers ordered by year
+          </p>
+          <EvolutionTab workspaceId={workspaceId} />
+        </div>
+      )}
+
+      {/* Gaps Tab */}
       {activeTab === "gaps" && (
-        <div className="text-center py-16 bg-[var(--card)] rounded-xl border border-[var(--border)]">
-          <Sparkles className="h-10 w-10 mx-auto mb-3 text-[var(--muted-foreground)] opacity-30" />
-          <p className="text-sm text-[var(--muted-foreground)]">Gap discovery — coming in Part 2</p>
+        <div>
+          <p className="text-xs text-[var(--muted-foreground)] mb-4">
+            Research gaps discovered by AI analysis
+          </p>
+          <GapsTab workspaceId={workspaceId} />
         </div>
       )}
+
+      {/* Conflicts Tab */}
+      {activeTab === "conflicts" && (
+        <div>
+          <p className="text-xs text-[var(--muted-foreground)] mb-4">
+            Potential contradictions between paper findings
+          </p>
+          <ConflictsTab workspaceId={workspaceId} />
+        </div>
+      )}
+
+      {/* Outline Tab */}
       {activeTab === "outline" && (
-        <div className="text-center py-16 bg-[var(--card)] rounded-xl border border-[var(--border)]">
-          <BookOpen className="h-10 w-10 mx-auto mb-3 text-[var(--muted-foreground)] opacity-30" />
-          <p className="text-sm text-[var(--muted-foreground)]">Outline generation — coming in Part 2</p>
+        <div>
+          <p className="text-xs text-[var(--muted-foreground)] mb-4">
+            Review outline — AI-generated or manually created
+          </p>
+          <OutlineTab workspaceId={workspaceId} />
         </div>
       )}
+
+      {/* Compare/Export Tab */}
       {activeTab === "compare" && (
-        <div className="text-center py-16 bg-[var(--card)] rounded-xl border border-[var(--border)]">
-          <FileText className="h-10 w-10 mx-auto mb-3 text-[var(--muted-foreground)] opacity-30" />
-          <p className="text-sm text-[var(--muted-foreground)]">Comparison table — coming in Part 2</p>
+        <div className="space-y-4">
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Export your review in different formats
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { fmt: "md", label: "Markdown", desc: "Universal text format" },
+              { fmt: "csv", label: "CSV", desc: "Sections metadata" },
+              { fmt: "latex", label: "LaTeX", desc: "Compilable .tex file" },
+            ].map(({ fmt, label, desc }) => (
+              <a
+                key={fmt}
+                href={`/api/reviews/${workspaceId}/export?format=${fmt}`}
+                className="p-4 rounded-lg border border-[var(--border)] hover:border-[var(--primary)]/30 bg-[var(--card)] text-center transition-colors cursor-pointer"
+              >
+                <Download className="h-5 w-5 mx-auto mb-2 text-[var(--primary)]" />
+                <p className="text-sm font-medium text-[var(--foreground)]">{label}</p>
+                <p className="text-[10px] text-[var(--muted-foreground)]">{desc}</p>
+              </a>
+            ))}
+          </div>
         </div>
       )}
 
@@ -633,6 +684,121 @@ export default function ReviewWorkspacePage() {
           </div>
         </div>
       </Dialog>
+    </div>
+  );
+}
+
+// --- Tab Components ---
+
+function EvolutionTab({ workspaceId }: { workspaceId: string }) {
+  const [data, setData] = useState<Array<{ id: string; title: string; year: number; method: string; contribution: string }>>([]);
+  useEffect(() => {
+    fetch(`/api/reviews/${workspaceId}/evolution`)
+      .then(r => r.json()).then(j => setData(j.data?.papers || []));
+  }, [workspaceId]);
+  if (!data.length) return <p className="text-sm text-[var(--muted-foreground)]">No parsed papers with year data yet.</p>;
+  return (
+    <div className="space-y-3">
+      {data.map((p, i) => (
+        <div key={p.id} className="flex items-start gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+          <div className="h-8 w-8 rounded-full bg-[var(--primary)]/10 flex items-center justify-center shrink-0 text-xs font-bold text-[var(--primary)]">{p.year}</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[var(--foreground)]">{p.title}</p>
+            {p.method && <p className="text-xs text-[var(--muted-foreground)] mt-0.5">Method: {p.method}</p>}
+          </div>
+          {i < data.length - 1 && (
+            <div className="h-full w-px bg-[var(--border)] absolute left-4 top-8" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GapsTab({ workspaceId }: { workspaceId: string }) {
+  const [gaps, setGaps] = useState<Array<{ id: string; title: string; description: string; confidence: number; status: string }>>([]);
+  useEffect(() => {
+    fetch(`/api/reviews/${workspaceId}`).then(r => r.json()).then(j => {
+      if (j.data?.gaps) setGaps(j.data.gaps);
+    });
+  }, [workspaceId]);
+  if (!gaps.length) return <p className="text-sm text-[var(--muted-foreground)]">No gaps discovered yet. Run the pipeline to find research gaps.</p>;
+  return (
+    <div className="space-y-3">
+      {gaps.map((g) => (
+        <div key={g.id} className="p-4 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="text-sm font-medium text-[var(--foreground)]">{g.title}</h4>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${g.status === "open" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}`}>{g.status}</span>
+          </div>
+          <p className="text-xs text-[var(--muted-foreground)] mb-2">{g.description}</p>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-[var(--muted-foreground)]">Confidence: {(g.confidence * 100).toFixed(0)}%</span>
+            <button
+              onClick={async () => {
+                await fetch(`/api/reviews/${workspaceId}/gaps/${g.id}/reject`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ reason: "Not relevant" }),
+                });
+                setGaps(gaps.map(g2 => g2.id === g.id ? { ...g2, status: "resolved" } : g2));
+                toast.success("Gap rejected");
+              }}
+              className="text-[10px] text-red-500 hover:underline"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConflictsTab({ workspaceId }: { workspaceId: string }) {
+  const [conflicts, setConflicts] = useState<Array<{ title: string; paperA: string; paperB: string; detail: string; severity: string }>>([]);
+  useEffect(() => {
+    fetch(`/api/reviews/${workspaceId}/conflicts`)
+      .then(r => r.json()).then(j => setConflicts(j.data || []));
+  }, [workspaceId]);
+  if (!conflicts.length) return <p className="text-sm text-[var(--muted-foreground)]">No conflicts detected between papers.</p>;
+  return (
+    <div className="space-y-3">
+      {conflicts.map((c, i) => (
+        <div key={i} className="p-4 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className={`h-4 w-4 ${c.severity === "major" ? "text-red-500" : "text-yellow-500"}`} />
+            <h4 className="text-sm font-medium text-[var(--foreground)]">{c.title}</h4>
+          </div>
+          <p className="text-xs text-[var(--muted-foreground)]">{c.detail}</p>
+          <div className="flex gap-4 mt-2">
+            <span className="text-[10px] text-[var(--muted-foreground)]">Paper A: {c.paperA.substring(0, 50)}</span>
+            <span className="text-[10px] text-[var(--muted-foreground)]">Paper B: {c.paperB.substring(0, 50)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OutlineTab({ workspaceId }: { workspaceId: string }) {
+  const [outline, setOutline] = useState<Array<{ id: string; title: string; orderIndex: number; sectionType: string }>>([]);
+  useEffect(() => {
+    fetch(`/api/reviews/${workspaceId}`).then(r => r.json()).then(j => {
+      if (j.data?.outline) setOutline(j.data.outline);
+    });
+  }, [workspaceId]);
+  if (!outline.length) return <p className="text-sm text-[var(--muted-foreground)]">No outline yet. Run the pipeline to generate one.</p>;
+  return (
+    <div className="space-y-2">
+      {outline.sort((a, b) => a.orderIndex - b.orderIndex).map((o) => (
+        <div key={o.id} className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+          <span className="text-[10px] font-mono text-[var(--muted-foreground)] w-5">{o.orderIndex + 1}</span>
+          <BookOpen className="h-4 w-4 text-[var(--muted-foreground)]" />
+          <p className="text-sm text-[var(--foreground)]">{o.title}</p>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--secondary)] text-[var(--muted-foreground)] ml-auto">{o.sectionType}</span>
+        </div>
+      ))}
     </div>
   );
 }
